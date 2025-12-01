@@ -72,4 +72,71 @@ func (d AocDay1) Puzzle1(useSample int) {
 
 func (d AocDay1) Puzzle2(useSample int) {
 
+	datafile := DIR + "data.txt"
+	if useSample == 1 {
+		datafile = DIR + "sample.txt"
+	}
+
+	f, err := os.Open(datafile)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Split(bufio.ScanLines)
+
+	var (
+		line                       []byte
+		dial                       int = 50
+		move, dir, password, start int
+	)
+
+	for scanner.Scan() {
+
+		line = scanner.Bytes()
+
+		if useSample > 0 {
+			fmt.Println("")
+			fmt.Println("DIAL: ", dial, " (Move:", string(line), ")")
+			fmt.Println("---------")
+		}
+
+		if line[0] == 'R' {
+			dir = 1
+		} else {
+			dir = -1
+		}
+
+		move, err = strconv.Atoi(string(line[1:]))
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		start = dial
+		dial += move * dir
+
+		if dial <= 0 {
+			password += dial / -100
+			if start != 0 {
+				password++
+			}
+		} else {
+			password += dial / 100
+		}
+
+		dial %= 100
+		if dial < 0 {
+			dial += 100
+		}
+
+		if useSample > 0 {
+			fmt.Println("Password:", password)
+		}
+
+	}
+
+	fmt.Println("")
+	fmt.Println("Password: ", password)
+
 }
