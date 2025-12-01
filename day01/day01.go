@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 )
 
 type AocDay1 struct{}
@@ -28,17 +29,44 @@ func (d AocDay1) Puzzle1(useSample int) {
 	scanner.Split(bufio.ScanLines)
 
 	var (
-		line string
+		line                []byte
+		dial                int = 50
+		move, dir, password int
 	)
 
 	for scanner.Scan() {
 
-		line = scanner.Text()
+		line = scanner.Bytes()
 
-		// Just a template to be copied...
-		fmt.Println(line)
+		if line[0] == 'R' {
+			dir = 1
+		} else {
+			dir = -1
+		}
+
+		move, err = strconv.Atoi(string(line[1:]))
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		dial += move * dir
+		dial %= 100
+		if dial < 0 {
+			dial += 100
+		}
+
+		if dial == 0 {
+			password++
+		}
+
+		if useSample > 0 {
+			fmt.Println(string(line), dial)
+		}
 
 	}
+
+	fmt.Println("")
+	fmt.Println("Password: ", password)
 
 }
 
