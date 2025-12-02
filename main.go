@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/wolv89/adventofcode2025/day01"
+	"github.com/wolv89/adventofcode2025/day02"
 )
 
 var (
@@ -46,6 +47,7 @@ func main() {
 
 	days := []AocDay{
 		day01.AocDay1{},
+		day02.AocDay2{},
 	}
 
 	flag.Parse()
