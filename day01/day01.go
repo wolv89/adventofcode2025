@@ -113,6 +113,11 @@ func (d AocDay1) Puzzle2(useSample int) {
 			log.Fatal(err.Error())
 		}
 
+		/*
+		 * Had to reference some of the solutions on Reddit to get the modulo approach correct
+		 * Credit to @bxdn in particular, I think this was the most directly helpful
+		 * https://github.com/bxdn/advent-of-go-solutions
+		 */
 		start = dial
 		dial += move * dir
 
