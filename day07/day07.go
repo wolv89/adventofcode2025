@@ -7,6 +7,7 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type AocDay7 struct{}
@@ -19,18 +20,50 @@ const (
 	CHAR_SPLITTER        = '^'
 	CHAR_SPLITTER_ACTIVE = '#'
 	CHAR_BEAM            = '|'
+
+	// In theory saving on conversions later?
+	STR_START    = "S"
+	STR_SPACE    = "."
+	STR_SPLITTER = "^"
+	STR_BEAM     = "|"
 )
 
+// This colour palette was AI generated
+var beamColours = []lipgloss.Style{
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#00FFFF")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#FF00FF")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#FF0000")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#BC13FE")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#0165FC")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#FF7124")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#FF028D")),
+}
+
+var beamChars = []byte{
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+}
+
 type Diagram struct {
-	state              [][]byte
-	width, height, row int
+	state               [][]byte
+	width, height, row  int
+	beamCount, lastBeam int
+	activeSplitters     int
 }
 
 func isBeam(c byte) bool {
-	return c == CHAR_BEAM
+	return c >= '0' && c <= '9'
+}
+
+func (d *Diagram) NewBeam() byte {
+	d.beamCount++
+	d.lastBeam = (d.lastBeam + 1) % len(beamColours)
+	return beamChars[d.lastBeam]
 }
 
 func (d *Diagram) Update() {
+
+	beamColours = append(beamColours[1:], beamColours[0])
 
 	if d.row >= d.height {
 		return
@@ -46,8 +79,10 @@ func (d *Diagram) Update() {
 
 			c = CHAR_SPACE
 
-			if isBeam(d.state[d.row-1][x]) || d.state[d.row-1][x] == CHAR_START {
-				c = CHAR_BEAM
+			if isBeam(d.state[d.row-1][x]) {
+				c = d.state[d.row-1][x]
+			} else if d.state[d.row-1][x] == CHAR_START {
+				c = d.NewBeam()
 			}
 
 		} else if d.state[d.row][x] == CHAR_SPLITTER {
@@ -56,12 +91,13 @@ func (d *Diagram) Update() {
 
 			if isBeam(d.state[d.row-1][x]) {
 				c = CHAR_SPLITTER_ACTIVE
+				d.activeSplitters++
 
 				if x > 0 && d.state[d.row][x-1] == CHAR_SPACE {
-					d.state[d.row][x-1] = CHAR_BEAM
+					d.state[d.row][x-1] = d.NewBeam()
 				}
 				if x < d.width-1 && d.state[d.row][x+1] == CHAR_SPACE {
-					d.state[d.row][x+1] = CHAR_BEAM
+					d.state[d.row][x+1] = d.NewBeam()
 				}
 			}
 
@@ -80,6 +116,8 @@ func (d AocDay7) Puzzle1(useSample int) {
 	datafile := DIR + "data.txt"
 	if useSample == 1 {
 		datafile = DIR + "sample.txt"
+	} else if useSample == 2 {
+		datafile = DIR + "sample2.txt"
 	}
 
 	f, err := os.Open(datafile)
@@ -94,24 +132,29 @@ func (d AocDay7) Puzzle1(useSample int) {
 	startingState := make([][]byte, 0)
 
 	for scanner.Scan() {
-		startingState = append(startingState, scanner.Bytes())
+		b := make([]byte, len(scanner.Bytes()))
+		copy(b, scanner.Bytes())
+		startingState = append(startingState, b)
 	}
 
 	diag := Diagram{
-		state:  startingState,
-		width:  len(startingState[0]),
-		height: len(startingState),
-		row:    1, // Start at 2nd row to always read off row above
+		state:     startingState,
+		width:     len(startingState[0]),
+		height:    len(startingState),
+		row:       1, // Start at 2nd row to always read off row above
+		beamCount: 0,
+		lastBeam:  -1,
 	}
 
 	p := tea.NewProgram(model{
 		sub:     make(chan struct{}),
 		diagram: &diag,
+		rawMode: false,
 	}, tea.WithAltScreen())
 
 	if _, err = p.Run(); err != nil {
 		fmt.Println("Quitting...")
-		os.Exit(1)
+		// os.Exit(1)
 	}
 
 }

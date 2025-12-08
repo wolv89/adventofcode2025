@@ -1,6 +1,7 @@
 package day07
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -9,8 +10,10 @@ import (
 )
 
 var (
-	baubleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#e73007"))
-	treeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#16df16"))
+	styleDefault        = lipgloss.NewStyle().Foreground(lipgloss.Color("#447744"))
+	styleActive         = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff"))
+	styleSplitter       = lipgloss.NewStyle().Foreground(lipgloss.Color("#aa9900"))
+	styleSplitterActive = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffff00"))
 )
 
 type updateMsg struct{}
@@ -18,7 +21,7 @@ type updateMsg struct{}
 func listenForUpdate(sub chan struct{}, diagram *Diagram) tea.Cmd {
 	return func() tea.Msg {
 		for {
-			time.Sleep(time.Millisecond * 500)
+			time.Sleep(time.Millisecond * 50)
 			diagram.Update()
 			sub <- struct{}{}
 		}
@@ -34,6 +37,7 @@ func waitForUpdate(sub chan struct{}) tea.Cmd {
 type model struct {
 	sub     chan struct{}
 	diagram *Diagram
+	rawMode bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -44,29 +48,70 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		return m, tea.Quit
+		switch msg.String() {
+		case "c", "q":
+			return m, tea.Quit
+		case "m":
+			m.rawMode = !m.rawMode
+			return m, nil
+		}
 	case updateMsg:
 		return m, waitForUpdate(m.sub)
-	default:
-		return m, nil
 	}
+	return m, nil
 }
 
 func (m model) View() string {
 
+	head := fmt.Sprintf("Beams: %d\nSplitters Activated: %d", m.diagram.beamCount, m.diagram.activeSplitters)
+
 	var s strings.Builder
 	s.Grow(m.diagram.height * (m.diagram.width + 1))
 
-	for i, row := range m.diagram.state {
-		if i%2 == 0 {
-			s.WriteString(baubleStyle.Render(string(row)) + "\n")
-		} else {
-			s.WriteString(treeStyle.Render(string(row)) + "\n")
+	if m.rawMode {
+		for _, row := range m.diagram.state {
+			s.WriteString(string(row) + "\n")
 		}
+		return head + "\n\n" + s.String() + "\n\n" + head
 	}
 
-	return s.String()
+	var (
+		spaceStyle lipgloss.Style
+		row        []byte
+		c          byte
+		i          int
+	)
+
+	for i, row = range m.diagram.state {
+
+		spaceStyle = styleDefault
+		if i == m.diagram.row-1 {
+			spaceStyle = styleActive
+		}
+
+		for _, c = range row {
+
+			switch c {
+			case CHAR_SPACE:
+				s.WriteString(spaceStyle.Render(STR_SPACE))
+			case CHAR_SPLITTER:
+				s.WriteString(styleSplitter.Render(STR_SPLITTER))
+			case CHAR_SPLITTER_ACTIVE:
+				s.WriteString(styleSplitterActive.Render(STR_SPLITTER))
+			case CHAR_START:
+				s.WriteString(styleSplitterActive.Render(STR_START))
+			default:
+				s.WriteString(beamColours[int(c-'0')].Render(STR_BEAM))
+			}
+
+		}
+
+		s.WriteString("\n")
+
+	}
+
+	return head + "\n\n" + s.String() + "\n\n" + head
 
 }
