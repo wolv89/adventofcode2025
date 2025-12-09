@@ -8,7 +8,9 @@ func (h PairHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 
 func (h *PairHeap) Push(x any) {
 	*h = append(*h, x.(Pair))
-	// for len(*h) > HeapLimit {
+	// Trying to keep the size of the heap down by only storing the top X values
+	// This doesn't really work
+	// for len(*h) > HeapLimit+1 {
 	// 	*h = (*h)[0 : len(*h)-1]
 	// }
 }

@@ -63,6 +63,9 @@ func (d AocDay8) Puzzle1(useSample int) {
 	// Lookup the index of the circuit a given point is in
 	circuitPoint := make(map[Point]int)
 
+	// Need a way to look up all the points in a circuit when they get joined/re-assigned
+	pointLists := make([][]Point, 1)
+
 	// Each box (point) is going to start in its own circuit
 	c = 1
 
@@ -92,6 +95,7 @@ func (d AocDay8) Puzzle1(useSample int) {
 
 		points = append(points, p)
 		circuits = append(circuits, 1)
+		pointLists = append(pointLists, []Point{p})
 		circuitPoint[p] = c
 		c++
 
@@ -135,7 +139,14 @@ func (d AocDay8) Puzzle1(useSample int) {
 		if c != c2 {
 			circuits[c] += circuits[c2]
 			circuits[c2] = 0
-			circuitPoint[pair.p2] = c
+
+			// This worked, whoop!
+			// Using a slice, not a set means I could end up with dupes of points within a given circuit, so this is not a perfect design
+			// But worked well enough in this case, and I guess my separate counter (the circuits slice) is less fallible to this duplication
+			for _, p := range pointLists[c2] {
+				circuitPoint[p] = c
+				pointLists[c] = append(pointLists[c], p)
+			}
 		}
 
 	}
