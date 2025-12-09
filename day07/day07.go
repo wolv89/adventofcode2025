@@ -46,9 +46,11 @@ var beamChars = []byte{
 
 type Diagram struct {
 	state               [][]byte
+	timeline            [][]int // For puzzle 2
 	width, height, row  int
 	beamCount, lastBeam int
 	activeSplitters     int
+	timelineCount       int
 }
 
 func isBeam(c byte) bool {
@@ -66,6 +68,11 @@ func (d *Diagram) Update() {
 	beamColours = append(beamColours[1:], beamColours[0])
 
 	if d.row >= d.height {
+		if len(d.timeline) > 0 && d.timelineCount == 0 {
+			for _, tl := range d.timeline[d.height-1] {
+				d.timelineCount += tl
+			}
+		}
 		return
 	}
 
@@ -81,7 +88,13 @@ func (d *Diagram) Update() {
 
 			if isBeam(d.state[d.row-1][x]) {
 				c = d.state[d.row-1][x]
+				if len(d.timeline) > 0 {
+					d.timeline[d.row][x] += d.timeline[d.row-1][x]
+				}
 			} else if d.state[d.row-1][x] == CHAR_START {
+				if len(d.timeline) > 0 {
+					d.timeline[d.row][x] = 1
+				}
 				c = d.NewBeam()
 			}
 
@@ -93,14 +106,28 @@ func (d *Diagram) Update() {
 				c = CHAR_SPLITTER_ACTIVE
 				d.activeSplitters++
 
-				if x > 0 && d.state[d.row][x-1] == CHAR_SPACE {
-					d.state[d.row][x-1] = d.NewBeam()
+				if x > 0 {
+					if d.state[d.row][x-1] == CHAR_SPACE {
+						d.state[d.row][x-1] = d.NewBeam()
+					}
+					if len(d.timeline) > 0 {
+						d.timeline[d.row][x-1] += d.timeline[d.row-1][x]
+					}
 				}
-				if x < d.width-1 && d.state[d.row][x+1] == CHAR_SPACE {
-					d.state[d.row][x+1] = d.NewBeam()
+				if x < d.width-1 {
+					if d.state[d.row][x+1] == CHAR_SPACE {
+						d.state[d.row][x+1] = d.NewBeam()
+					}
+					if len(d.timeline) > 0 {
+						d.timeline[d.row][x+1] += d.timeline[d.row-1][x]
+					}
 				}
 			}
 
+		} else if isBeam(d.state[d.row][x]) {
+			if len(d.timeline) > 0 {
+				d.timeline[d.row][x] += d.timeline[d.row-1][x]
+			}
 		}
 
 		d.state[d.row][x] = c
@@ -160,5 +187,54 @@ func (d AocDay7) Puzzle1(useSample int) {
 }
 
 func (d AocDay7) Puzzle2(useSample int) {
+
+	datafile := DIR + "data.txt"
+	if useSample == 1 {
+		datafile = DIR + "sample.txt"
+	}
+
+	f, err := os.Open(datafile)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Split(bufio.ScanLines)
+
+	startingState := make([][]byte, 0)
+
+	for scanner.Scan() {
+		b := make([]byte, len(scanner.Bytes()))
+		copy(b, scanner.Bytes())
+		startingState = append(startingState, b)
+	}
+
+	w, h := len(startingState[0]), len(startingState)
+	tline := make([][]int, h)
+	for t := range tline {
+		tline[t] = make([]int, w)
+	}
+
+	diag := Diagram{
+		state:     startingState,
+		width:     w,
+		height:    h,
+		timeline:  tline,
+		row:       1, // Start at 2nd row to always read off row above
+		beamCount: 0,
+		lastBeam:  -1,
+	}
+
+	p := tea.NewProgram(model{
+		sub:     make(chan struct{}),
+		diagram: &diag,
+		rawMode: false,
+	}, tea.WithAltScreen())
+
+	if _, err = p.Run(); err != nil {
+		fmt.Println("Quitting...")
+		// os.Exit(1)
+	}
 
 }

@@ -35,9 +35,10 @@ func waitForUpdate(sub chan struct{}) tea.Cmd {
 }
 
 type model struct {
-	sub     chan struct{}
-	diagram *Diagram
-	rawMode bool
+	sub          chan struct{}
+	diagram      *Diagram
+	rawMode      bool
+	timelineMode bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -56,6 +57,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "m":
 			m.rawMode = !m.rawMode
 			return m, nil
+		case "t":
+			m.timelineMode = !m.timelineMode
+			return m, nil
 		}
 	case updateMsg:
 		return m, waitForUpdate(m.sub)
@@ -66,6 +70,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 
 	head := fmt.Sprintf("Beams: %d\nSplitters Activated: %d", m.diagram.beamCount, m.diagram.activeSplitters)
+	tail := ""
+	if len(m.diagram.timeline) > 0 {
+		tail = fmt.Sprintf("Timelines: %d", m.diagram.timelineCount)
+	}
 
 	var s strings.Builder
 	s.Grow(m.diagram.height * (m.diagram.width + 1))
@@ -74,7 +82,19 @@ func (m model) View() string {
 		for _, row := range m.diagram.state {
 			s.WriteString(string(row) + "\n")
 		}
-		return head + "\n\n" + s.String() + "\n\n" + head
+		return head + "\n\n" + s.String() + "\n\n" + head + "\n" + tail
+	} else if m.timelineMode {
+		for _, row := range m.diagram.timeline {
+			for _, t := range row {
+				if t == 0 {
+					s.WriteString(styleDefault.Render(". "))
+				} else {
+					s.WriteString(fmt.Sprintf("%d ", t))
+				}
+			}
+			s.WriteString("\n")
+		}
+		return head + "\n\n" + s.String() + "\n\n" + head + "\n" + tail
 	}
 
 	var (
@@ -112,6 +132,6 @@ func (m model) View() string {
 
 	}
 
-	return head + "\n\n" + s.String() + "\n\n" + head
+	return head + "\n\n" + s.String() + "\n\n" + head + "\n" + tail
 
 }
