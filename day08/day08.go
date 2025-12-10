@@ -167,9 +167,172 @@ func (d AocDay8) Puzzle1(useSample int) {
 	fmt.Println("Result:", res)
 
 	// Attempt 1: 7106 (Too low?)
+	// Confirmed: way too low !
 
 }
 
+type Box struct {
+	x, y, z int
+	c       *Circuit
+}
+
+// Realised the distance doesn't actually need 64 bits...
+type BoxPair struct {
+	dist   int
+	b1, b2 *Box
+}
+
+type Circuit struct {
+	boxes map[*Box]struct{}
+	index int
+}
+
+func (c *Circuit) Connect(b *Box) {
+	c.boxes[b] = struct{}{}
+}
+
 func (d AocDay8) Puzzle2(useSample int) {
+
+	datafile := DIR + "data.txt"
+
+	if useSample == 1 {
+		datafile = DIR + "sample.txt"
+	}
+
+	f, err := os.Open(datafile)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Split(bufio.ScanLines)
+
+	var (
+		line    string
+		dist    int
+		x, y, z int
+	)
+
+	boxes := make([]Box, 0)
+
+	circuits := &CircuitHeap{}
+	heap.Init(circuits)
+
+	for scanner.Scan() {
+
+		line = scanner.Text()
+		coords := strings.Split(line, ",")
+
+		x, err = strconv.Atoi(coords[0])
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		y, err = strconv.Atoi(coords[1])
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		z, err = strconv.Atoi(coords[2])
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		box := Box{
+			x: x,
+			y: y,
+			z: z,
+		}
+
+		circuit := Circuit{
+			make(map[*Box]struct{}),
+			0,
+		}
+
+		circuit.Connect(&box)
+		box.c = &circuit
+
+		boxes = append(boxes, box)
+		heap.Push(circuits, &circuit)
+
+	}
+
+	pairs := &BoxPairHeap{}
+
+	heap.Init(pairs)
+
+	for x = 0; x < len(boxes)-1; x++ {
+		for y = x + 1; y < len(boxes); y++ {
+
+			p1, p2 := &boxes[x], &boxes[y]
+
+			dist = int(math.Pow(float64(p1.x-p2.x), 2)) + int(math.Pow(float64(p1.y-p2.y), 2)) + int(math.Pow(float64(p1.z-p2.z), 2))
+
+			pair := BoxPair{
+				dist: dist,
+				b1:   p1,
+				b2:   p2,
+			}
+
+			heap.Push(pairs, pair)
+
+		}
+	}
+
+	var pair BoxPair
+
+	for pairs.Len() > 0 {
+
+		if circ := circuits.Peek().(*Circuit); len(circ.boxes) > 1 {
+			break
+		}
+
+		pair = heap.Pop(pairs).(BoxPair)
+		box1, box2 := pair.b1, pair.b2
+
+		if useSample > 0 {
+			fmt.Println("")
+			fmt.Println("# PAIRING ----------------------------------------------------------------------")
+			fmt.Println(box1)
+			fmt.Println(box2)
+		}
+
+		if box1.c != box2.c {
+
+			oldCircuit := box2.c
+
+			if useSample > 0 {
+				fmt.Println("Before: ", len(box1.c.boxes), " + ", len(box2.c.boxes))
+			}
+
+			for b := range box2.c.boxes {
+				box1.c.Connect(b)
+				b.c = box1.c
+			}
+
+			// Not sure why this isn't covered by the line above
+			box2.c = box1.c
+
+			if oldCircuit.index < circuits.Len() {
+				heap.Remove(circuits, oldCircuit.index)
+			}
+			if box1.c.index < circuits.Len() {
+				heap.Fix(circuits, box1.c.index)
+			}
+
+			if useSample > 0 {
+				fmt.Println("> Added all boxes from b2 circuit to b1")
+			}
+
+		}
+
+	}
+
+	fmt.Println("")
+	fmt.Println(pair.b1)
+	fmt.Println(pair.b2)
+	fmt.Println("")
+	fmt.Println("Result:", pair.b1.x*pair.b2.x)
 
 }
