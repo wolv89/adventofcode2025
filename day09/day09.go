@@ -100,13 +100,8 @@ func abs(x int) int {
 	return x
 }
 
-type Line struct {
-	start, end, anchor int
-}
-
-type Rect struct {
-	c1, c2 Point
-	area   int
+type Edge struct {
+	a, b Point
 }
 
 func (d AocDay9) Puzzle2(useSample int) {
@@ -126,15 +121,14 @@ func (d AocDay9) Puzzle2(useSample int) {
 	scanner.Split(bufio.ScanLines)
 
 	var (
-		p1, p2                 Point
-		l1, l2, target         Line
-		line                   string
-		x, y, b, area          int
-		width, height          int
-		xmin, xmax, ymin, ymax int
+		p1, p2        Point
+		line          string
+		x, y          int
+		width, height int
 	)
 
 	points := make([]Point, 0)
+	pointMap := make(map[Point]struct{})
 
 	for scanner.Scan() {
 
@@ -145,111 +139,168 @@ func (d AocDay9) Puzzle2(useSample int) {
 		width = max(width, x)
 		height = max(height, y)
 
-		points = append(points, Point{x, y})
+		p1 = Point{x, y}
+		points = append(points, p1)
+		pointMap[p1] = struct{}{}
 
 	}
 
-	// Add first point to list at the end to fully wrap around
 	points = append(points, points[0])
 	n := len(points)
 
-	verts, horis := make([]Line, 0, n/2), make([]Line, 0, n/2)
-
+	ver, hor := make([]Edge, 0, n/2), make([]Edge, 0, n/2)
 	for x = 1; x < n; x++ {
-
 		p1, p2 = points[x-1], points[x]
-
-		// Vertical
 		if p1.x == p2.x {
-
-			verts = append(verts, Line{
-				start:  min(p1.y, p2.y),
-				end:    max(p1.y, p2.y),
-				anchor: p1.x,
-			})
-
+			if p1.y > p2.y {
+				p1, p2 = p2, p1
+			}
+			ver = append(ver, Edge{p1, p2})
 		} else {
+			if p1.x > p2.x {
+				p1, p2 = p2, p1
+			}
+			hor = append(hor, Edge{p1, p2})
+		}
+	}
 
-			horis = append(horis, Line{
-				start:  min(p1.x, p2.x),
-				end:    max(p1.x, p2.x),
-				anchor: p1.y,
-			})
+	slices.SortFunc(ver, func(e, f Edge) int {
+		return cmp.Compare(e.a.x, f.a.x)
+	})
+	slices.SortFunc(hor, func(e, f Edge) int {
+		return cmp.Compare(e.a.y, f.a.y)
+	})
 
+	if useSample > 0 {
+		fmt.Println(ver)
+		fmt.Println(hor)
+		fmt.Println("")
+	}
+
+	n--
+	points = points[:n]
+
+	getValidArea := func(p1, p2 Point) int {
+
+		xmin, xmax := min(p1.x, p2.x), max(p1.x, p2.x)
+		ymin, ymax := min(p1.y, p2.y), max(p1.y, p2.y)
+
+		corners := [4]Point{
+			{xmin, ymin},
+			{xmin, ymax},
+			{xmax, ymax},
+			{xmax, ymin},
 		}
 
-	}
+		if useSample > 0 {
+			fmt.Println("")
+			fmt.Println("\t", corners)
+		}
 
-	lineCmp := func(a, b Line) int {
-		return cmp.Compare(a.anchor, b.anchor)
-	}
-	slices.SortFunc(verts, lineCmp)
-	slices.SortFunc(horis, lineCmp)
+		// rect := [4]Edge{
+		// 	{corners[0], corners[1]},
+		// 	{corners[1], corners[2]},
+		// 	{corners[2], corners[3]},
+		// 	{corners[3], corners[0]},
+		// }
 
-	vn, hn := len(verts), len(horis)
+	cornercheck:
+		for _, c := range corners {
 
-	// Remove the duplicated point from earlier
-	points = points[:n-1]
-	n--
-
-	for x = 0; x < n-1; x++ {
-	control: // Naming this as I just saw the trailer for Control Resonant (hyyyppee)
-		for y = x + 1; y < n; y++ {
-
-			p1, p2 = points[x], points[y]
-
-			if p1.x == p2.x || p1.y == p2.y {
+			if _, ok := pointMap[c]; ok {
+				if useSample > 0 {
+					fmt.Println("\t\t", c, " is an exact point")
+				}
 				continue
 			}
 
-			fmt.Println("")
-			fmt.Println("RECTANGLE ", p1, p2)
+			pointEdge := Edge{c, c}
 
-			xmin = min(p1.x, p2.x)
-			xmax = max(p1.x, p2.x)
-			ymin = min(p1.y, p2.y)
-			ymax = max(p1.y, p2.y)
-
-			// Top, Bottom
-			l1 = Line{start: xmin, end: xmax, anchor: ymin}
-			l2 = Line{start: xmin, end: xmax, anchor: ymax}
-
-			fmt.Println("\t", l1, l2)
-
-			target = Line{0, 0, l1.start}
-			b, _ = slices.BinarySearchFunc(verts, target, lineCmp)
-			for ; b < vn; b++ {
-				fmt.Println("\t\t", verts[b])
-				if verts[b].anchor >= l1.end {
-					break
-				}
-				if (verts[b].start < l1.anchor && verts[b].end > l1.anchor) || (verts[b].start < l2.anchor && verts[b].end > l2.anchor) {
-					break control
+			// Search vertical edges, to see if point sits on any of them
+			i, found := slices.BinarySearchFunc(ver, pointEdge, func(e, f Edge) int {
+				return cmp.Compare(e.a.x, f.a.x)
+			})
+			if found {
+				for ; i < len(ver); i++ {
+					if ver[i].a.x != c.x {
+						break
+					}
+					if ver[i].a.y < c.y && ver[i].b.y > c.y {
+						if useSample > 0 {
+							fmt.Println("\t\t", c, "on edge", ver[i])
+						}
+						continue cornercheck
+					}
 				}
 			}
 
-			// Left, Right
-			l1 = Line{start: ymin, end: ymax, anchor: xmin}
-			l2 = Line{start: ymin, end: ymax, anchor: xmax}
-
-			fmt.Println("\t", l1, l2)
-
-			target = Line{0, 0, l1.start}
-			b, _ = slices.BinarySearchFunc(horis, target, lineCmp)
-			for ; b < hn; b++ {
-				fmt.Println("\t\t", horis[b])
-				if horis[b].anchor >= l1.end {
-					break
-				}
-				if (horis[b].start < l1.anchor && horis[b].end > l1.anchor) || (horis[b].start < l2.anchor && horis[b].end > l2.anchor) {
-					break control
+			// If not, try horizontal edges
+			i, found = slices.BinarySearchFunc(hor, pointEdge, func(e, f Edge) int {
+				return cmp.Compare(e.a.y, f.a.y)
+			})
+			if found {
+				for ; i < len(hor); i++ {
+					if hor[i].a.y != c.y {
+						break
+					}
+					if hor[i].a.x < c.x && hor[i].b.x > c.x {
+						if useSample > 0 {
+							fmt.Println("\t\t", c, "on edge", hor[i])
+						}
+						continue cornercheck
+					}
 				}
 			}
 
-			fmt.Println("\t>>> Valid - ", (abs(p1.y-p2.y)+1)*(abs(p1.x-p2.x)+1))
-			area = max(area, (abs(p1.y-p2.y)+1)*(abs(p1.x-p2.x)+1))
+			if useSample > 0 {
+				fmt.Println("\t\t sweeping")
+			}
+
+			// If not on an edge, then we sweep across lines until we hit the point, toggling our status from outside to in
+			inside := false
+
+			for _, e := range ver {
+
+				if e.a.y <= c.y && e.b.y > c.y {
+					inside = !inside
+				}
+				if c.x >= e.a.x {
+					break
+				}
+
+			}
+
+			if !inside {
+				return 0
+			}
 
 		}
+
+		return (abs(p1.y-p2.y) + 1) * (abs(p1.x-p2.x) + 1)
+
+	}
+
+	var (
+		pa, pb Point
+		area   int
+	)
+
+	for x = 0; x < n-1; x++ {
+
+		pa = points[x]
+
+		for y = x + 1; y < n; y++ {
+
+			pb = points[y]
+
+			if pa.x == pb.x || pa.y == pb.y {
+				continue
+			}
+
+			area = max(area, getValidArea(pa, pb))
+
+		}
+
 	}
 
 	fmt.Println("")
