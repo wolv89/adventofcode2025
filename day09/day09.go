@@ -100,15 +100,12 @@ func abs(x int) int {
 	return x
 }
 
-var DIRS = [4][2]int{
-	{-1, 0},
-	{1, 0},
-	{0, -1},
-	{0, 1},
+type Line struct {
+	start, end, anchor int
 }
 
 type Rect struct {
-	p1, p2 Point
+	c1, c2 Point
 	area   int
 }
 
@@ -129,11 +126,12 @@ func (d AocDay9) Puzzle2(useSample int) {
 	scanner.Split(bufio.ScanLines)
 
 	var (
-		rc                Rect
-		p, p1, p2, p3, p4 Point
-		line              string
-		x, y, dx, dy      int
-		width, height     int
+		p1, p2                 Point
+		l1, l2, target         Line
+		line                   string
+		x, y, b, area          int
+		width, height          int
+		xmin, xmax, ymin, ymax int
 	)
 
 	points := make([]Point, 0)
@@ -151,163 +149,110 @@ func (d AocDay9) Puzzle2(useSample int) {
 
 	}
 
-	// Capture before adding the repeated point
+	// Add first point to list at the end to fully wrap around
+	points = append(points, points[0])
 	n := len(points)
 
-	fmt.Println("1. Parsed points from TXT file", n)
+	verts, horis := make([]Line, 0, n/2), make([]Line, 0, n/2)
 
-	// Repeat point 1, to loop cleanly
-	points = append(points, points[0])
+	for x = 1; x < n; x++ {
 
-	fmt.Println("Tack")
+		p1, p2 = points[x-1], points[x]
 
-	height += 2
-	width += 2
+		// Vertical
+		if p1.x == p2.x {
 
-	fmt.Println("Expand", width, height)
+			verts = append(verts, Line{
+				start:  min(p1.y, p2.y),
+				end:    max(p1.y, p2.y),
+				anchor: p1.x,
+			})
 
-	grid := make([][]byte, height)
-	for x = 0; x < height; x++ {
-		grid[x] = make([]byte, width)
-		for y = 0; y < width; y++ {
-			grid[x][y] = '.'
-		}
-	}
+		} else {
 
-	fmt.Println("(1.5. Created blank grid)")
-
-	for x = 1; x < len(points); x++ {
-
-		fmt.Printf("\tDrawing from point %d to %d\n", x-1, x)
-
-		for p = range WalkBetween(points[x-1], points[x]) {
-			grid[p.y][p.x] = 'X'
-		}
-
-		grid[points[x-1].y][points[x-1].x] = '#'
-		grid[points[x].y][points[x].x] = '#'
-
-	}
-
-	fmt.Println("2. Drawn polygon border")
-
-	checked := make([][]bool, height)
-	for x = range checked {
-		checked[x] = make([]bool, width)
-	}
-	next := []Point{{0, 0}}
-
-	for len(next) > 0 {
-
-		x, y = next[0].x, next[0].y
-		next = next[1:]
-
-		if checked[x][y] {
-			continue
-		}
-
-		checked[x][y] = true
-		grid[x][y] = '~'
-
-		for _, dir := range DIRS {
-
-			dx, dy = x+dir[0], y+dir[1]
-
-			if dx < 0 || dy < 0 || dx >= height || dy >= width || checked[dx][dy] || grid[dx][dy] != '.' {
-				continue
-			}
-
-			next = append(next, Point{dx, dy})
+			horis = append(horis, Line{
+				start:  min(p1.x, p2.x),
+				end:    max(p1.x, p2.x),
+				anchor: p1.y,
+			})
 
 		}
 
 	}
 
-	for x = range grid {
-		for y = range grid[x] {
-			switch grid[x][y] {
-			case '.':
-				grid[x][y] = 'X'
-			case '~':
-				grid[x][y] = '.'
-			}
-		}
+	lineCmp := func(a, b Line) int {
+		return cmp.Compare(a.anchor, b.anchor)
 	}
+	slices.SortFunc(verts, lineCmp)
+	slices.SortFunc(horis, lineCmp)
 
-	fmt.Println("3. Flood fill complete")
+	vn, hn := len(verts), len(horis)
 
-	// Bit arbitrary, pre allocate space for half of the n by n-1 possibilities
-	rects := make([]Rect, 0, (n*(n-1))/2)
+	// Remove the duplicated point from earlier
+	points = points[:n-1]
+	n--
 
 	for x = 0; x < n-1; x++ {
+	control: // Naming this as I just saw the trailer for Control Resonant (hyyyppee)
 		for y = x + 1; y < n; y++ {
+
 			p1, p2 = points[x], points[y]
+
 			if p1.x == p2.x || p1.y == p2.y {
 				continue
 			}
-			rects = append(rects, Rect{
-				p1:   p1,
-				p2:   p2,
-				area: (abs(p1.y-p2.y) + 1) * (abs(p1.x-p2.x) + 1),
-			})
-		}
-	}
 
-	slices.SortFunc(rects, func(a, b Rect) int {
-		return cmp.Compare(b.area, a.area)
-	})
+			fmt.Println("")
+			fmt.Println("RECTANGLE ", p1, p2)
 
-	fmt.Println("4. Calculated possible rectangles", len(rects))
-	var a int
+			xmin = min(p1.x, p2.x)
+			xmax = max(p1.x, p2.x)
+			ymin = min(p1.y, p2.y)
+			ymax = max(p1.y, p2.y)
 
-outer:
-	for a, rc = range rects {
+			// Top, Bottom
+			l1 = Line{start: xmin, end: xmax, anchor: ymin}
+			l2 = Line{start: xmin, end: xmax, anchor: ymax}
 
-		if a > 100 {
-			break
-		}
+			fmt.Println("\t", l1, l2)
 
-		// p1 and p2 on the rect are opposite corners
-		p1, p3 = rc.p1, rc.p2
-		p2 = Point{p1.x, p3.y}
-		p4 = Point{p3.x, p1.y}
-
-		for p = range WalkBetween(p1, p2) {
-			if grid[p.y][p.x] == '.' {
-				continue outer
+			target = Line{0, 0, l1.start}
+			b, _ = slices.BinarySearchFunc(verts, target, lineCmp)
+			for ; b < vn; b++ {
+				fmt.Println("\t\t", verts[b])
+				if verts[b].anchor >= l1.end {
+					break
+				}
+				if (verts[b].start < l1.anchor && verts[b].end > l1.anchor) || (verts[b].start < l2.anchor && verts[b].end > l2.anchor) {
+					break control
+				}
 			}
-		}
 
-		for p = range WalkBetween(p2, p3) {
-			if grid[p.y][p.x] == '.' {
-				continue outer
+			// Left, Right
+			l1 = Line{start: ymin, end: ymax, anchor: xmin}
+			l2 = Line{start: ymin, end: ymax, anchor: xmax}
+
+			fmt.Println("\t", l1, l2)
+
+			target = Line{0, 0, l1.start}
+			b, _ = slices.BinarySearchFunc(horis, target, lineCmp)
+			for ; b < hn; b++ {
+				fmt.Println("\t\t", horis[b])
+				if horis[b].anchor >= l1.end {
+					break
+				}
+				if (horis[b].start < l1.anchor && horis[b].end > l1.anchor) || (horis[b].start < l2.anchor && horis[b].end > l2.anchor) {
+					break control
+				}
 			}
-		}
 
-		for p = range WalkBetween(p3, p4) {
-			if grid[p.y][p.x] == '.' {
-				continue outer
-			}
-		}
+			fmt.Println("\t>>> Valid - ", (abs(p1.y-p2.y)+1)*(abs(p1.x-p2.x)+1))
+			area = max(area, (abs(p1.y-p2.y)+1)*(abs(p1.x-p2.x)+1))
 
-		for p = range WalkBetween(p4, p1) {
-			if grid[p.y][p.x] == '.' {
-				continue outer
-			}
-		}
-
-		break
-
-	}
-
-	if useSample > 0 {
-		fmt.Println("")
-		for x = range grid {
-			fmt.Println(string(grid[x]))
 		}
 	}
 
 	fmt.Println("")
-	fmt.Println("Rect:", rc)
+	fmt.Println("Max area:", area)
 
 }
