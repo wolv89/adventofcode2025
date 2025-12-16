@@ -225,7 +225,7 @@ func (d AocDay9) Puzzle2(useSample int) {
 					if ver[i].a.x != c.x {
 						break
 					}
-					if ver[i].a.y < c.y && ver[i].b.y > c.y {
+					if ver[i].a.y <= c.y && ver[i].b.y >= c.y {
 						if useSample > 0 {
 							fmt.Println("\t\t", c, "on edge", ver[i])
 						}
@@ -243,7 +243,7 @@ func (d AocDay9) Puzzle2(useSample int) {
 					if hor[i].a.y != c.y {
 						break
 					}
-					if hor[i].a.x < c.x && hor[i].b.x > c.x {
+					if hor[i].a.x <= c.x && hor[i].b.x >= c.x {
 						if useSample > 0 {
 							fmt.Println("\t\t", c, "on edge", hor[i])
 						}
