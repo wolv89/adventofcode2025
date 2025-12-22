@@ -193,12 +193,14 @@ func (d AocDay11) Puzzle2(useSample int) {
 
 	}
 
-	names := make([]string, i)
-	for dname, did := range devices {
-		names[did] = fmt.Sprintf("%s", dname)
-	}
+	var names []string
 
 	if useSample > 0 {
+
+		names = make([]string, i)
+		for dname, did := range devices {
+			names[did] = fmt.Sprintf("%s", dname)
+		}
 
 		for dname, did := range devices {
 			fmt.Printf("%s: %d\n", dname, did)
@@ -221,95 +223,122 @@ func (d AocDay11) Puzzle2(useSample int) {
 	fmt.Println("fft:", fft, " dac:", dac)
 	fmt.Println("")
 
-	stepsFrom := func(start int, log ...bool) []int {
+	indStart := make([]int, i)
 
-		seen := make(map[seenEdge]struct{})
+	for _, nodes := range edges {
+		for _, node := range nodes {
+			indStart[node]++
+		}
+	}
 
-		steps := make([]int, i)
-		q := []int{start}
+	/*
+	 * This reads funny, but we always walk the full path from the starting node (which is svr, not the "start" param)
+	 * We only start counting paths once we reach the "start" param, but need to walk from the start to drop the in-degree counts
+	 * Perhaps there's a better way?
+	 * Ok a bit more reading and yes indeed there are much better ways, like doing the walk just once and generating a proper sorting of the nodes
+	 * to then count the paths between them more quickly (although this runs pretty dang fast as is)
+	 */
+	countPaths := func(start, end int) int64 {
 
-		var (
-			qued []int
-			node int
-			ok   bool
-		)
+		ind := make([]int, i)
+		copy(ind, indStart)
+
+		paths := make([]int64, i)
+		var node, e int
+
+		q := []int{svr}
+		paths[svr]++
+
+		started := false
 
 		for len(q) > 0 {
 
 			node, q = q[0], q[1:]
-
-			if len(log) > 0 && log[0] {
-				qued = make([]int, 0)
+			if node >= len(edges) {
+				continue
 			}
 
-			for _, e := range edges[node] {
-				steps[e]++
-				if _, ok = seen[seenEdge{node, e}]; !ok {
+			if node == start {
+				started = true
+			}
+
+			for _, e = range edges[node] {
+
+				if started {
+					if node == start {
+						paths[e] = 1
+					} else {
+						paths[e] += paths[node]
+					}
+				}
+
+				ind[e]--
+				if ind[e] == 0 {
 					q = append(q, e)
-					seen[seenEdge{node, e}] = struct{}{}
-					if len(log) > 0 && log[0] {
-						qued = append(qued, e)
-					}
 				}
-			}
 
-			if len(log) > 0 && log[0] {
-				fmt.Printf("Node: %s (%d)\n", names[node], node)
-				if len(qued) > 0 {
-					fmt.Print("\t")
-					for _, qn := range qued {
-						fmt.Printf("%s (%d) ", names[qn], qn)
-					}
-					fmt.Print("\n")
-				}
 			}
 
 		}
 
-		return steps
+		return paths[end]
 
 	}
 
-	validPaths := 0
+	s2d := countPaths(svr, dac)
+	d2f := countPaths(dac, fft)
+	f2o := countPaths(fft, out)
 
-	svr2dac := stepsFrom(svr)       // map[int]struct{}{fft: {}, dac: {}, out: {}}
-	dac2fft := stepsFrom(dac, true) // map[int]struct{}{fft: {}, out: {}}
-	fft2out := stepsFrom(fft)       // map[int]struct{}{out: {}, dac: {}}
+	s2f := countPaths(svr, fft)
+	f2d := countPaths(fft, dac)
+	d2o := countPaths(dac, out)
 
-	if useSample > 0 {
-		fmt.Println(svr2dac, svr2dac[dac])
-		fmt.Println(dac2fft, dac2fft[fft])
-		fmt.Println(fft2out, fft2out[out])
-		fmt.Println("")
-	} else {
-		fmt.Println(svr2dac[dac])
-		fmt.Println(dac2fft[fft])
-		fmt.Println(fft2out[out])
-		fmt.Println("")
-	}
+	sum1 := s2d * d2f * f2o
+	sum2 := s2f * f2d * d2o
 
-	validPaths += svr2dac[dac] * dac2fft[fft] * fft2out[out]
-
-	// This now seems to just be repeated work...
-	svr2fft := stepsFrom(svr)
-	fft2dac := stepsFrom(fft)
-	dac2out := stepsFrom(dac)
-
-	if useSample > 0 {
-		fmt.Println(svr2fft, svr2fft[fft])
-		fmt.Println(fft2dac, fft2dac[dac])
-		fmt.Println(dac2out, dac2out[out])
-		fmt.Println("")
-	} else {
-		fmt.Println(svr2fft[fft])
-		fmt.Println(fft2dac[dac])
-		fmt.Println(dac2out[out])
-		fmt.Println("")
-	}
-
-	validPaths += svr2fft[fft] * fft2dac[dac] * dac2out[out]
+	fmt.Printf("%d * %d * %d = %d\n", s2d, d2f, f2o, sum1)
+	fmt.Printf("%d * %d * %d = %d\n", s2f, f2d, d2o, sum2)
 
 	fmt.Println("")
-	fmt.Println("Valid paths:", validPaths)
+	fmt.Println("Total paths:", sum1+sum2)
 
 }
+
+/*
+func countPaths(adj map[string][]string, start, end string) int {
+	inDegree := make(map[string]int)
+	for u := range adj {
+		for _, v := range adj[u] {
+			inDegree[v]++
+		}
+	}
+
+	// paths[node] stores number of ways to reach 'node' from 'start'
+	paths := make(map[string]int)
+	paths[start] = 1
+
+	queue := []string{}
+	// In a true Topo Sort, you'd add all 0-in-degree nodes.
+	// For path counting from a specific start, we start there.
+	for node := range adj {
+		if inDegree[node] == 0 {
+			queue = append(queue, node)
+		}
+	}
+
+	for len(queue) > 0 {
+		u := queue[0]
+		queue = queue[1:]
+
+		for _, v := range adj[u] {
+			paths[v] += paths[u]
+			inDegree[v]--
+			if inDegree[v] == 0 {
+				queue = append(queue, v)
+			}
+		}
+	}
+
+	return paths[end]
+}
+*/
