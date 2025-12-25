@@ -7,7 +7,6 @@ import (
 	"iter"
 	"log"
 	"os"
-	"slices"
 )
 
 type AocDay9 struct{}
@@ -100,10 +99,6 @@ func abs(x int) int {
 	return x
 }
 
-type Edge struct {
-	a, b Point
-}
-
 func (d AocDay9) Puzzle2(useSample int) {
 
 	datafile := DIR + "data.txt"
@@ -121,14 +116,19 @@ func (d AocDay9) Puzzle2(useSample int) {
 	scanner.Split(bufio.ScanLines)
 
 	var (
-		p1, p2        Point
 		line          string
 		x, y          int
 		width, height int
 	)
 
+	// Hard coded from generating an SVG render of the shape
+	// and figuring out which point would be the most likely anchor
+	// and working off that (limited by where it would start leaving the bounds)
+	// Holy heck...
+	anchor := Point{94880, 50218}
+	lim := 69776
+
 	points := make([]Point, 0)
-	pointMap := make(map[Point]struct{})
 
 	for scanner.Scan() {
 
@@ -139,167 +139,27 @@ func (d AocDay9) Puzzle2(useSample int) {
 		width = max(width, x)
 		height = max(height, y)
 
-		p1 = Point{x, y}
-		points = append(points, p1)
-		pointMap[p1] = struct{}{}
+		p := Point{x, y}
+
+		if p == anchor {
+			break
+		}
+
+		points = append(points, p)
 
 	}
 
-	points = append(points, points[0])
-	n := len(points)
+	area := 0
 
-	ver, hor := make([]Edge, 0, n/2), make([]Edge, 0, n/2)
-	for x = 1; x < n; x++ {
-		p1, p2 = points[x-1], points[x]
-		if p1.x == p2.x {
-			if p1.y > p2.y {
-				p1, p2 = p2, p1
-			}
-			ver = append(ver, Edge{p1, p2})
-		} else {
-			if p1.x > p2.x {
-				p1, p2 = p2, p1
-			}
-			hor = append(hor, Edge{p1, p2})
-		}
-	}
+	for i := len(points) - 1; i >= 0; i-- {
 
-	slices.SortFunc(ver, func(e, f Edge) int {
-		return cmp.Compare(e.a.x, f.a.x)
-	})
-	slices.SortFunc(hor, func(e, f Edge) int {
-		return cmp.Compare(e.a.y, f.a.y)
-	})
-
-	if useSample > 0 {
-		fmt.Println(ver)
-		fmt.Println(hor)
-		fmt.Println("")
-	}
-
-	n--
-	points = points[:n]
-
-	getValidArea := func(p1, p2 Point) int {
-
-		xmin, xmax := min(p1.x, p2.x), max(p1.x, p2.x)
-		ymin, ymax := min(p1.y, p2.y), max(p1.y, p2.y)
-
-		corners := [4]Point{
-			{xmin, ymin},
-			{xmin, ymax},
-			{xmax, ymax},
-			{xmax, ymin},
+		p := points[i]
+		if p.y > lim {
+			break
 		}
 
-		if useSample > 0 {
-			fmt.Println("")
-			fmt.Println("\t", corners)
-		}
-
-		// rect := [4]Edge{
-		// 	{corners[0], corners[1]},
-		// 	{corners[1], corners[2]},
-		// 	{corners[2], corners[3]},
-		// 	{corners[3], corners[0]},
-		// }
-
-	cornercheck:
-		for _, c := range corners {
-
-			if _, ok := pointMap[c]; ok {
-				if useSample > 0 {
-					fmt.Println("\t\t", c, " is an exact point")
-				}
-				continue
-			}
-
-			pointEdge := Edge{c, c}
-
-			// Search vertical edges, to see if point sits on any of them
-			i, found := slices.BinarySearchFunc(ver, pointEdge, func(e, f Edge) int {
-				return cmp.Compare(e.a.x, f.a.x)
-			})
-			if found {
-				for ; i < len(ver); i++ {
-					if ver[i].a.x != c.x {
-						break
-					}
-					if ver[i].a.y <= c.y && ver[i].b.y >= c.y {
-						if useSample > 0 {
-							fmt.Println("\t\t", c, "on edge", ver[i])
-						}
-						continue cornercheck
-					}
-				}
-			}
-
-			// If not, try horizontal edges
-			i, found = slices.BinarySearchFunc(hor, pointEdge, func(e, f Edge) int {
-				return cmp.Compare(e.a.y, f.a.y)
-			})
-			if found {
-				for ; i < len(hor); i++ {
-					if hor[i].a.y != c.y {
-						break
-					}
-					if hor[i].a.x <= c.x && hor[i].b.x >= c.x {
-						if useSample > 0 {
-							fmt.Println("\t\t", c, "on edge", hor[i])
-						}
-						continue cornercheck
-					}
-				}
-			}
-
-			if useSample > 0 {
-				fmt.Println("\t\t sweeping")
-			}
-
-			// If not on an edge, then we sweep across lines until we hit the point, toggling our status from outside to in
-			inside := false
-
-			for _, e := range ver {
-
-				if e.a.y <= c.y && e.b.y > c.y {
-					inside = !inside
-				}
-				if c.x >= e.a.x {
-					break
-				}
-
-			}
-
-			if !inside {
-				return 0
-			}
-
-		}
-
-		return (abs(p1.y-p2.y) + 1) * (abs(p1.x-p2.x) + 1)
-
-	}
-
-	var (
-		pa, pb Point
-		area   int
-	)
-
-	for x = 0; x < n-1; x++ {
-
-		pa = points[x]
-
-		for y = x + 1; y < n; y++ {
-
-			pb = points[y]
-
-			if pa.x == pb.x || pa.y == pb.y {
-				continue
-			}
-
-			area = max(area, getValidArea(pa, pb))
-
-		}
+		area = max(area, (abs(anchor.y-p.y)+1)*(abs(anchor.x-p.x)+1))
+		// fmt.Println(i, area)
 
 	}
 

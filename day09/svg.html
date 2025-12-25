@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+    <title>Day 9</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style type="text/css">
+        *,
+        html,
+        body {
+            padding: 0;
+            margin: 0;
+        }
+
+        body {
+            background: linear-gradient(#222, #333);
+            min-height: 100vh;
+        }
+
+        #studio {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding-top: 2rem;
+        }
+
+        #log {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            box-shadow: 2px 4px 2px rgba(0, 0, 0, 0.1);
+            color: #fff;
+            padding: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="studio">
+        <canvas id="canvas" width="1000" height="1000"></canvas>
+    </div>
+    <div id="log">
+        <pre>Some log text</pre>
+    </div>
+    <script type="text/javascript">
+
+        /*
+        THIS SCRIPT LARGELY WRITTEN BY GEMINI OVER A FEW ROUNDS OF PROMPTING
+        */
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const logElement = document.querySelector('#log pre');
+
+
+        // Configuration
+        const hitRadius = 10; // The "clickable" area around each point
+        let points; // Your 500 random points
+        let selectedPoint = null;
+        let hoveredPoint = null;
+
+        // 1. Get Mouse Coordinates relative to Canvas
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        // 2. Find a point near the mouse
+        function findNeighbor(mousePos) {
+            return points.find(p => {
+                const dx = p.x - mousePos.x;
+                const dy = p.y - mousePos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance < hitRadius;
+            });
+        }
+
+        // 3. Handle Hover (Cursor Change)
+        canvas.addEventListener('mousemove', (e) => {
+            const mousePos = getMousePos(e);
+            hoveredPoint = findNeighbor(mousePos);
+
+            // Change cursor style if hovering over a point
+            canvas.style.cursor = hoveredPoint ? 'pointer' : 'default';
+
+            // Optional: Re-draw if you want to highlight the hovered point
+            updateLog(mousePos);
+            draw();
+        });
+
+        // 4. Handle Click (Selection)
+        canvas.addEventListener('mousedown', (e) => {
+            const mousePos = getMousePos(e);
+            const clickedPoint = findNeighbor(mousePos);
+
+            if (clickedPoint) {
+                selectedPoint = clickedPoint;
+                console.log("Selected Point:", selectedPoint);
+                updateLog(mousePos);
+                draw();
+            } else {
+                selectedPoint = null;
+                updateLog(mousePos);
+                draw();
+            }
+        });
+
+        function updateLog(mousePos = { x: 0, y: 0 }) {
+            const mouseCoords = `Mouse Position: [${Math.round(mousePos.x)}, ${Math.round(mousePos.y)}]`;
+
+            let selectionCoords = "Selected Point: None";
+            let hoverCoords = "Hovered Point:  None";
+            let areaInfo = "Rectangle Area: 0px²";
+
+            if (selectedPoint) {
+                selectionCoords = `Selected Point: [${selectedPoint.x}, ${selectedPoint.y}]`;
+            }
+
+            if (hoveredPoint) {
+                hoverCoords = `Hovered Point:  [${hoveredPoint.x}, ${hoveredPoint.y}]`;
+
+                // If both exist, calculate the area
+                if (selectedPoint) {
+                    const width = Math.abs(selectedPoint.x - hoveredPoint.x);
+                    const height = Math.abs(selectedPoint.y - hoveredPoint.y);
+                    const area = width * height;
+                    areaInfo = `Rectangle Area: ${Math.round(area).toLocaleString()}px² (${Math.round(width)}x${Math.round(height)})`;
+                }
+            }
+
+            logElement.textContent = `${mouseCoords}\n${selectionCoords}\n${hoverCoords}\n${areaInfo}`;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw the main polygon
+            if (points.length >= 2) {
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#666';
+                ctx.fillStyle = 'rgba(255,255,255,0.1)'
+                ctx.moveTo(points[0].x, points[0].y);
+                points.forEach(p => ctx.lineTo(p.x, p.y));
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            // 2. Draw Connection Line (if a point is selected AND another is hovered)
+            if (selectedPoint && hoveredPoint && selectedPoint !== hoveredPoint) {
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]); // Create a dashed "preview" line
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.moveTo(selectedPoint.x, selectedPoint.y);
+                ctx.lineTo(hoveredPoint.x, hoveredPoint.y);
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset to solid line for everything else
+
+                // Optional: Draw the rectangle boundaries
+                ctx.strokeRect(
+                    selectedPoint.x,
+                    selectedPoint.y,
+                    hoveredPoint.x - selectedPoint.x,
+                    hoveredPoint.y - selectedPoint.y
+                );
+            }
+
+            // 3. Draw Points
+            points.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                if (p === selectedPoint) ctx.fillStyle = 'red';
+                else if (p === hoveredPoint) ctx.fillStyle = 'blue';
+                else ctx.fillStyle = 'black';
+                ctx.fill();
+            });
+        }
+
+        // Data removed
+        points = [{ x: 1, y: 2 }...];
+
+        draw();
+
+    </script>
+</body>
+
+</html>
